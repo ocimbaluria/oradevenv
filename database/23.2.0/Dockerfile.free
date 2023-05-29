@@ -18,7 +18,7 @@
 #
 # Pull base image
 # ---------------
-FROM oraclelinux:8
+FROM oraclelinux:8-slim
 
 # Labels
 # ------
