@@ -1,0 +1,28 @@
+# Creation time : 6m
+services:
+  oracle:
+    build: 
+      context: ./database/23.2.0
+      dockerfile: Dockerfile.free
+    image: ocimbaluria/free23c
+    container_name: oracle
+    environment:
+      ORACLE_PASSWORD: ${DATABASE_SYSTEM_PASSWORD}
+    ports:
+      - 1521:1521
+    volumes:
+      - $DB_DATA_BASE_DIR/data:/opt/oracle/oradata
+    networks:
+      - oracle_network_demoapp
+    healthcheck: 
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+networks:
+  oracle_network_demoapp:
+    driver: bridge
+
+#source .env
+#sudo mkdir -p ${DB_DATA_BASE_DIR} ; sudo chown $USER:$USER ${DB_DATA_BASE_DIR}
+#mkdir -p ${DB_DATA_BASE_DIR}/data ; chmod 775 ${DB_DATA_BASE_DIR}/data ; sudo chown :54321 ${DB_DATA_BASE_DIR}/data
