@@ -50,7 +50,9 @@ ENV ORACLE_BASE=/opt/oracle \
     CONFIG_TCPS_FILE="configTcps.sh" \
     INSTALL_DIR="$HOME/install" \
     ORACLE_DOCKER_INSTALL="true" \
-    CHECKPOINT_FILE_EXTN=".created" 
+    CHECKPOINT_FILE_EXTN=".created" \
+    PACKAGE_MANAGER="microdnf" \
+    INSTALL_FILE_2="/tmp/oracle-database-free-23c-1.0-1.el8.x86_64.rpm"
 
 # Use second ENV so that variable get substituted
 ENV PATH=$ORACLE_HOME/bin:$PATH
@@ -67,12 +69,13 @@ RUN mkdir -p "$ORACLE_BASE" && \
     chmod ug+x *.sh && \
     sync && \
     ./"$CHECK_SPACE_FILE" && \
-    yum -y install expect && \
+    ${PACKAGE_MANAGER} -y install expect && \
     ./"$SETUP_LINUX_FILE" && \
     chown -R oracle:oinstall "$ORACLE_BASE" /home/oracle && \
     sed -i -r 's/(^session\s+include\s+system-auth)/# \1/' /etc/pam.d/su && \
-    unbuffer yum -y install "$INSTALL_FILE_1" && \
-    yum -y remove expect && \
+    curl ${INSTALL_FILE_1} -o ${INSTALL_FILE_2} && \
+    unbuffer ${PACKAGE_MANAGER} -y install "$INSTALL_FILE_2" && \
+    ${PACKAGE_MANAGER} -y remove expect && \
     rm -rf /var/cache/yum && \
     rm -rf /var/tmp/yum-* && \
     mv "$CONF_FILE" /etc/sysconfig/ && \
