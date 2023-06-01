@@ -31,14 +31,13 @@ LABEL "provider"="Oracle"                                               \
       "volume.startup.location2"="/docker-entrypoint-initdb.d/startup"  \
       "port.listener"="1521"                                            
 
-ARG INSTALL_FILE_1="https://download.oracle.com/otn-pub/otn_software/db-free/oracle-database-free-23c-1.0-1.el8.x86_64.rpm"
+ARG INSTALL_FILE="https://download.oracle.com/otn-pub/otn_software/db-free/oracle-database-free-23c-1.0-1.el8.x86_64.rpm"
 
 # Environment variables required for this build (do NOT change)
 # -------------------------------------------------------------
 ENV ORACLE_BASE=/opt/oracle \
     ORACLE_HOME=/opt/oracle/product/23c/dbhomeFree \
     ORACLE_SID=FREE \
-    INSTALL_FILE_1=$INSTALL_FILE_1 \
     RUN_FILE="runOracle.sh" \
     PWD_FILE="setPassword.sh" \
     CREATE_DB_FILE="createDB.sh" \
@@ -50,9 +49,7 @@ ENV ORACLE_BASE=/opt/oracle \
     CONFIG_TCPS_FILE="configTcps.sh" \
     INSTALL_DIR="$HOME/install" \
     ORACLE_DOCKER_INSTALL="true" \
-    CHECKPOINT_FILE_EXTN=".created" \
-    PACKAGE_MANAGER="microdnf" \
-    INSTALL_FILE_2="/tmp/oracle-database-free-23c-1.0-1.el8.x86_64.rpm"
+    CHECKPOINT_FILE_EXTN=".created"
 
 # Use second ENV so that variable get substituted
 ENV PATH=$ORACLE_HOME/bin:$PATH
@@ -63,30 +60,46 @@ COPY $CHECK_SPACE_FILE $CONF_FILE $SETUP_LINUX_FILE $RUN_FILE $PWD_FILE $CHECK_D
 
 WORKDIR $INSTALL_DIR
 
+# Create local repo
+RUN mkdir /var/localrepo && \
+    curl ${INSTALL_FILE} --output /var/localrepo/oracle-database-free-23c-1.0-1.el8.x86_64.rpm
+
+RUN microdnf -y install createrepo
+COPY ./local.repo /etc/yum.repos.d/local.repo
+RUN createrepo /var/localrepo
+#    microdnf -y remove createrepo
+#RUN microdnf clean all
+#ADD ./repodata /var/localrepo/repodata
+
+
 # hadolint ignore=DL3003,DL3033,SC2035
 RUN mkdir -p "$ORACLE_BASE" && \
     mv "$RUN_FILE" "$PWD_FILE" "$CHECK_DB_FILE" "$CREATE_DB_FILE" "$USER_SCRIPTS_FILE" "$CONFIG_TCPS_FILE" "$ORACLE_BASE"/ && \
+    microdnf upgrade --refresh --best --nodocs --noplugins --setopt=install_weak_deps=0 && \
     chmod ug+x *.sh && \
     sync && \
     ./"$CHECK_SPACE_FILE" && \
-    ${PACKAGE_MANAGER} -y install expect && \
+    microdnf -y install expect && \
     ./"$SETUP_LINUX_FILE" && \
     chown -R oracle:oinstall "$ORACLE_BASE" /home/oracle && \
     sed -i -r 's/(^session\s+include\s+system-auth)/# \1/' /etc/pam.d/su && \
-    curl ${INSTALL_FILE_1} -o ${INSTALL_FILE_2} && \
-    unbuffer ${PACKAGE_MANAGER} -y install "$INSTALL_FILE_2" && \
-    ${PACKAGE_MANAGER} -y remove expect && \
-    rm -rf /var/cache/yum && \
-    rm -rf /var/tmp/yum-* && \
+    microdnf repolist && \
+    microdnf repoquery | grep 23c && \
+    ls -l /var/localrepo/* && \
+    microdnf -y install oracle-database-free-23c.x86_64 && \
     mv "$CONF_FILE" /etc/sysconfig/ && \
     cd "$HOME" && \
     rm -rf "$INSTALL_DIR" && \
     "$ORACLE_BASE"/oraInventory/orainstRoot.sh && \
     "$ORACLE_HOME"/root.sh && \
+    microdnf -y remove expect && \
+    rm -rf /var/cache/yum && \
+    rm -rf /var/tmp/yum-* && \
     echo 'export ORACLE_SID=FREE' > .bashrc
 
 USER oracle
 WORKDIR /home/oracle
+
 
 HEALTHCHECK --interval=1m --start-period=5m --timeout=30s \
    CMD "$ORACLE_BASE/$CHECK_DB_FILE" >/dev/null || exit 1

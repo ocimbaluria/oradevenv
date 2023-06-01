@@ -1,0 +1,5 @@
+[Local-Free-23c]
+name=Oracle Database 23c Free for developers
+gpgcheck=0
+enabled=1
+baseurl=file:///var/localrepo
